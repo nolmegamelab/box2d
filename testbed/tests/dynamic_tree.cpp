@@ -28,12 +28,12 @@ public:
 
 	enum
 	{
-		e_actorCount = 128
+		e_actorCount = 10000
 	};
 
 	DynamicTree()
 	{
-		m_worldExtent = 15.0f;
+		m_worldExtent = 200.0f;
 		m_proxyExtent = 0.5f;
 
 		srand(888);
