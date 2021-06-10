@@ -11,6 +11,7 @@ set(BOX2D_SOURCE_FILES
 	collision/b2_edge_shape.cpp
 	collision/b2_polygon_shape.cpp
 	collision/b2_time_of_impact.cpp
+	collision/b2_sector_grid.cpp
 	common/b2_block_allocator.cpp
 	common/b2_draw.cpp
 	common/b2_math.cpp
@@ -83,6 +84,7 @@ set(BOX2D_HEADER_FILES
 	../include/box2d/b2_pulley_joint.h
 	../include/box2d/b2_revolute_joint.h
 	../include/box2d/b2_rope.h
+	../include/box2d/b2_sector_grid.h
 	../include/box2d/b2_settings.h
 	../include/box2d/b2_shape.h
 	../include/box2d/b2_stack_allocator.h
