@@ -11,6 +11,7 @@ set(BOX2D_SOURCE_FILES
 	collision/b2_edge_shape.cpp
 	collision/b2_polygon_shape.cpp
 	collision/b2_time_of_impact.cpp
+	collision/b2_sector.cpp
 	collision/b2_sector_grid.cpp
 	common/b2_block_allocator.cpp
 	common/b2_draw.cpp
@@ -84,6 +85,7 @@ set(BOX2D_HEADER_FILES
 	../include/box2d/b2_pulley_joint.h
 	../include/box2d/b2_revolute_joint.h
 	../include/box2d/b2_rope.h
+	../include/box2d/b2_sector.h
 	../include/box2d/b2_sector_grid.h
 	../include/box2d/b2_settings.h
 	../include/box2d/b2_shape.h
@@ -96,9 +98,15 @@ set(BOX2D_HEADER_FILES
 	../include/box2d/b2_wheel_joint.h
 	../include/box2d/b2_world.h
 	../include/box2d/b2_world_callbacks.h
-	../include/box2d/box2d.h)
+	../include/box2d/box2d.h
+	)
+	
+set(RX_HEADER_FILES
+	../include/rx/lock/lock_guards.hpp
+	../include/rx/lock/lock_thread_tracer.hpp
+	../include/rx/lock/lockable.hpp)	
 
-add_library(box2d ${BOX2D_SOURCE_FILES} ${BOX2D_HEADER_FILES})
+add_library(box2d ${BOX2D_SOURCE_FILES} ${BOX2D_HEADER_FILES} ${RX_HEADER_FILES})
 target_include_directories(box2d
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
@@ -108,7 +116,7 @@ target_include_directories(box2d
 )
 
 set_target_properties(box2d PROPERTIES
-	CXX_STANDARD 11
+	CXX_STANDARD 17
     CXX_STANDARD_REQUIRED YES
     CXX_EXTENSIONS NO
     VERSION ${PROJECT_VERSION}
