@@ -316,7 +316,7 @@ struct GLRenderPoints
 		m_count = 0;
 	}
 
-	enum { e_maxVertices = 512 };
+	enum { e_maxVertices = 16 * 512 };
 	b2Vec2 m_vertices[e_maxVertices];
 	b2Color m_colors[e_maxVertices];
 	float m_sizes[e_maxVertices];
@@ -446,7 +446,7 @@ struct GLRenderLines
 		m_count = 0;
 	}
 
-	enum { e_maxVertices = 2 * 512 };
+	enum { e_maxVertices = 64 * 1024 };
 	b2Vec2 m_vertices[e_maxVertices];
 	b2Color m_colors[e_maxVertices];
 
@@ -577,7 +577,7 @@ struct GLRenderTriangles
 		m_count = 0;
 	}
 
-	enum { e_maxVertices = 3 * 512 };
+	enum { e_maxVertices = 16 * 512 };
 	b2Vec2 m_vertices[e_maxVertices];
 	b2Color m_colors[e_maxVertices];
 

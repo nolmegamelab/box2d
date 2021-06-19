@@ -26,6 +26,7 @@
 #include "b2_api.h"
 #include "b2_collision.h"
 #include "b2_growable_stack.h"
+#include <vector>
 
 #define b2_nullNode (-1)
 
@@ -55,6 +56,29 @@ struct B2_API b2TreeNode
 	int32 height;
 
 	bool moved;
+};
+
+struct b2QueryVectorCallback
+{
+
+	b2QueryVectorCallback(std::vector<int32>& lst)
+		: m_lst(lst)
+	{
+	}
+
+	bool QueryCallback(int32 nodeId)
+	{
+		m_lst.push_back(nodeId);
+		return true;
+	}
+
+	float RayCastCallback(b2RayCastInput& input, int32 nodeId)
+	{
+		m_lst.push_back(nodeId);
+		return 0.1f;	// get all objects overlapping with the ray
+	}
+
+	std::vector<int32>& m_lst;
 };
 
 /// A dynamic AABB tree broad-phase, inspired by Nathanael Presson's btDbvt.
@@ -110,6 +134,12 @@ public:
 	/// @param callback a callback class that is called for each proxy that is hit by the ray.
 	template <typename T>
 	void RayCast(T* callback, const b2RayCastInput& input) const;
+
+	// Query nodes and put the result into lst
+	int Query(const b2AABB& aabb, std::vector<int32>& lst) const;
+
+	// RayCast nodes and put the result into lst
+	int RayCast(const b2RayCastInput& input, std::vector<int32>& lst) const;
 
 	/// Validate this tree. For testing.
 	void Validate() const;
@@ -303,6 +333,20 @@ inline void b2DynamicTree::RayCast(T* callback, const b2RayCastInput& input) con
 			stack.Push(node->child2);
 		}
 	}
+}
+
+inline int b2DynamicTree::Query(const b2AABB& aabb, std::vector<int32>& lst) const
+{
+	b2QueryVectorCallback cb(lst);
+	Query(&cb, aabb);
+	return static_cast<int>(lst.size());
+}
+
+inline int b2DynamicTree::RayCast(const b2RayCastInput& input, std::vector<int32>& lst) const
+{
+	b2QueryVectorCallback cb(lst);
+	RayCast(&cb, input);
+	return static_cast<int>(lst.size());
 }
 
 #endif

@@ -8,9 +8,6 @@
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "lockable.hpp"
-#include "lock_tracer.hpp"
-#include "spdlog/fmt/fmt.h"
-#include <rx/log.hpp>
 
 #include <array>
 #include <cassert>
@@ -83,7 +80,7 @@ public:
 
     if ((current_ + 1) >= max_lock_depth)
     {
-      throw lock_exception(fmt::format("max lock depth reached in enter_xlock. current:{}", current_).c_str());
+      throw lock_exception("max lock depth reached in enter_xlock.");
       //return -1;
     }
 
@@ -144,7 +141,7 @@ public:
 
   void exit_xlock(lockable* lock)
   {
-    RX_UNUSED(lock);
+    lock;
 
     assert(current_ >= 0);
 
@@ -229,7 +226,7 @@ public:
 
     if ((current_ + 1) >= max_lock_depth)
     {
-      throw lock_exception(fmt::format("max lock depth reached in enter_slock. current:{}", current_).c_str());
+      throw lock_exception("max lock depth reached in enter_slock");
       //return -1;
     }
 
@@ -362,6 +359,7 @@ public:
   {
     std::string result; 
 
+#if 0
     for (int i = 0; i < current_; ++i)
     {
       auto lock = &locks_[i];
@@ -383,6 +381,7 @@ public:
     {
       return "<>";
     }
+#endif
 
     return result;
   }
@@ -395,7 +394,6 @@ private:
       initialized_ = true;
 
       id_ = std::this_thread::get_id();
-      lock_tracer::inst.add(this);
     }
   }
 

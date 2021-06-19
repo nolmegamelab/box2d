@@ -135,6 +135,8 @@ public:
 			m_textLine += m_textIncrement;
 		}
 
+		g_debugDraw.Flush();
+
 		++m_stepCount;
 	}
 
