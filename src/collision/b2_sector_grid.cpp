@@ -201,7 +201,7 @@ void b2SectorGrid::Move(b2ObjectId oid, const b2Vec2& position, const b2Rot& rot
 
 void b2SectorGrid::EnsureSector(int ix, int iy)
 {
-  b2Assert(CheckIndexBounds(ix, iy));
+  // Spawn과 Move에서 체크하므로 그 외 범위 생성은 허용한다. 
 
   rx::slock slock(m_lock);
 

@@ -298,8 +298,8 @@ public:
 
 	enum
 	{
-		e_actorCount = 3000, 
-		e_projectileCount = 3000 , 
+		e_actorCount = 3, 
+		e_projectileCount = 3, 
 		e_threadCount = 4
 	};
 
