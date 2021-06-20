@@ -110,6 +110,18 @@ public:
 
   void DetachProxyAll();
 
+  int GetProxyIdBy(b2Sector* sector)
+  {
+    for (auto& proxy : m_proxies)
+    {
+      if (proxy.attached && proxy.sector == sector)
+      {
+        return proxy.proxyId;
+      }
+    }
+    return -1;
+  }
+
   bool IsAttached(b2Sector* sector)
   {
     for (auto& proxy : m_proxies)

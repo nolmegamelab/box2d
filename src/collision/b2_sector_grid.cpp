@@ -180,8 +180,16 @@ void b2SectorGrid::Move(b2ObjectId oid, const b2Vec2& position, const b2Rot& rot
 
   // 겹치는 attach 안 된 인접한 섹터들에 추가.
   int cnt = ApplyNeighbors(ix, iy, [this, &aabb, obj](b2Sector* sector) {
-    if (sector->IsOverlapping(aabb) && !obj->IsAttached(sector))
+    if (sector->IsOverlapping(aabb))
     {
+      if (obj->IsAttached(sector))
+      {
+        auto proxyId = obj->GetProxyIdBy(sector);
+        b2Assert(proxyId >= 0);
+        sector->MoveProxy(proxyId, aabb, b2Vec2());
+        return true;
+      }
+      // else
       auto proxyId = sector->CreateProxy(aabb, (void*)obj);
       obj->AttachProxy(sector, proxyId);
       return true;

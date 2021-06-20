@@ -41,13 +41,17 @@ public:
 
 	void Move()
 	{
-		m_dir = b2Vec2(m_rotation.c, m_rotation.s);
-		m_dir *= 30;
-		m_position += m_dir;
-
-		if ( !IsInWorldBounds() )
+		// xlock
 		{
-			m_position = m_spos;
+			rx::xlock xlock(m_lock);
+			m_dir = b2Vec2(m_rotation.c, m_rotation.s);
+			m_dir *= 30;
+			m_position += m_dir;
+
+			if (!IsInWorldBounds())
+			{
+				m_position = m_spos;
+			}
 		}
 
 		m_grid->Move(m_objectId, m_position, m_rotation);
@@ -55,16 +59,22 @@ public:
 
 	void Collide(std::function<void(int)> cb)
 	{
-		b2Transform xf(m_position, m_rotation);
-		b2SectorObject collider(m_objectId, m_obb, m_filter, xf, &m_id, true);
 
-		std::vector<int> lst;
-
-		if (m_grid->Query<int>(collider, lst) > 0)
+		// slock
 		{
-			for (auto id : lst)
+			rx::slock slock(m_lock);
+
+			b2Transform xf(m_position, m_rotation);
+			b2SectorCollider collider(m_obb, m_filter, xf);
+
+			std::vector<int> lst;
+
+			if (m_grid->Query<int>(collider, lst) > 0)
 			{
-				cb(id);
+				for (auto id : lst)
+				{
+					cb(id);
+				}
 			}
 		}
 	}
@@ -118,6 +128,7 @@ private:
 	b2Rot m_rotation;
 	b2Vec2 m_dir;
 	b2PolygonShape* m_obb;
+	rx::lockable m_lock;
 };
 
 class Actor
@@ -158,8 +169,12 @@ public:
 		dir.Normalize();
 		dir *= 30;
 
-		m_position += dir;
-		m_rotation = b2Rot(RandomFloat(-0.785f, 0.785f));
+		// xlock
+		{
+			rx::xlock xlock(m_lock);
+			m_position += dir;
+			m_rotation = b2Rot(RandomFloat(-0.785f, 0.785f));
+		}
 
 		ClampToWorldBounds();
 		m_grid->Move(m_objectId, m_position, m_rotation);
@@ -223,6 +238,7 @@ private:
 	bool m_overlap;
 	b2Vec2 m_position;
 	b2Rot m_rotation;
+	rx::lockable m_lock;
 };
 
 // SectrGrid
@@ -234,8 +250,9 @@ public:
 
 	enum
 	{
-		e_actorCount = 1000, 
-		e_projectileCount = 1000 
+		e_actorCount = 3000, 
+		e_projectileCount = 3000 , 
+		e_threadCount = 4
 	};
 
 	SectorGrid()
@@ -250,6 +267,7 @@ public:
 		settings.sectorSize = 1000;
 
 		m_grid = new b2SectorGrid(settings);
+		m_mouseObb.SetAsBox(50, 50);
 
 		srand(888);
 
@@ -278,10 +296,70 @@ public:
 			m_projectiles[i] = projectile;
 			projectile->Spawn();
 		}
+
+		m_threads.reserve(e_threadCount);
+		m_threads.resize(e_threadCount);
+
+		for (int ti = 0; ti < e_threadCount; ++ti)
+		{
+			std::thread thread([this, ti]() {
+
+				while ( !m_stop )
+				{ 
+					if (!m_paused)
+					{
+						int actorPerThreadCount = e_actorCount / e_threadCount;
+						int asi = actorPerThreadCount * ti;
+						int aei = actorPerThreadCount * (ti + 1);
+
+						for (int32 i = asi; i < aei; ++i)
+						{
+							m_actors[i]->SetOverlap(false);
+						}
+
+						for (int32 i = asi; i < aei; ++i)
+						{
+							m_actors[i]->MoveRandom();
+						}
+
+						int projectilePerThreadCount = e_projectileCount / e_threadCount;
+						int psi = projectilePerThreadCount * ti;
+						int pei = projectilePerThreadCount * (ti + 1);
+						for (int32 i = psi; i < pei; ++i)
+						{
+							m_projectiles[i]->Move();
+						}
+
+						for (int32 i = psi; i < pei; ++i)
+						{
+							m_projectiles[i]->Collide([this](int id) {
+								if (1 <= id && id <= e_actorCount)
+								{
+									int index = id - 1;
+									m_actors[index]->SetOverlap(true);
+								}
+								});
+						}
+					}
+				}
+
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+				});
+
+			m_threads[ti].swap(thread);
+		}
 	}
 
 	~SectorGrid()
 	{
+		m_stop = true; 
+
+		for (int i = 0; i < e_threadCount; ++i)
+		{
+			m_threads[i].join();
+		}
+
 		for (int32 i = 0; i < e_actorCount; ++i)
 		{
 			delete m_actors[i];
@@ -308,40 +386,51 @@ public:
 
 		B2_NOT_USED(settings);
 
-		if (!settings.m_pause)
-		{
-			for (int32 i = 0; i < e_actorCount; ++i)
-			{
-				m_actors[i]->SetOverlap(false);
-			}
-
-			for (int32 i = 0; i < e_actorCount; ++i)
-			{
-				m_actors[i]->MoveRandom();
-			}
-
-			for (int32 i = 0; i < e_actorCount; ++i)
-			{
-				m_projectiles[i]->Move();
-			}
-
-			for (int32 i = 0; i < e_actorCount; ++i)
-			{
-				m_projectiles[i]->Collide([this](int id) {
-					if (1 <= id && id <= e_actorCount)
-					{
-						int index = id - 1;
-						m_actors[index]->SetOverlap(true);
-					}
-					});
-			}
-		}
+		m_paused = settings.m_pause;
 
 		DrawGrids();
 		DrawActors();
 		DrawProjectiles();
+		DrawMouseOBB();
+
+		g_debugDraw.DrawString(b2Vec2(0, 0), m_coord.c_str());
 
 		g_debugDraw.Flush();
+	}
+
+	void MouseDown(const b2Vec2& p) override
+	{
+		Test::MouseDown(p);
+
+		m_mousePos = p;
+
+		b2SectorCollider collider(&m_mouseObb, b2Filter(), b2Transform(p, b2Rot(0)));
+
+		std::vector<int> lst;
+		int cnt = m_grid->Query(collider, lst);
+
+		char buf[128];
+		sprintf_s(buf, "<%.2f, %.2f>, count: %d", p.x, p.y, cnt);
+    m_coord = buf;
+	}
+
+	void DrawMouseOBB()
+	{
+		b2Vec2 vs[4];
+
+		for (int iv = 0; iv < 4; ++iv)
+		{
+			auto v = m_mouseObb.m_vertices[iv];
+			vs[iv].x = v.x + m_mousePos.x;
+			vs[iv].y = v.y + m_mousePos.y;
+		}
+
+		b2Color c(1, 1, 1);
+
+		g_debugDraw.DrawSegment(vs[0], vs[1], c);
+		g_debugDraw.DrawSegment(vs[1], vs[2], c);
+		g_debugDraw.DrawSegment(vs[2], vs[3], c);
+		g_debugDraw.DrawSegment(vs[3], vs[0], c);
 	}
 
 	void DrawGrids()
@@ -403,9 +492,7 @@ public:
 			g_debugDraw.DrawSegment(vs[2], vs[3], c);
 			g_debugDraw.DrawSegment(vs[3], vs[0], c);
 
-			char buf[24];
-			sprintf_s(buf, "%d", i + 1);
-			g_debugDraw.DrawString(pos, buf);
+			// g_debugDraw.DrawString(pos, "%d", i + 1);
 		}
 	}
 
@@ -443,6 +530,12 @@ private:
 	std::array<Actor*, e_actorCount> m_actors;
 	std::array<Projectile*, e_projectileCount> m_projectiles;
 	int32 m_stepCount;
+	b2PolygonShape m_mouseObb;
+	b2Vec2	m_mousePos;
+	std::string m_coord;
+	bool m_paused = false;
+	bool m_stop = false;
+	std::vector<std::thread> m_threads;
 };
 
 static int testIndex = RegisterTest("Collision", "Sector Grid", SectorGrid::Create);

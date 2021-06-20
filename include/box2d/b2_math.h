@@ -286,7 +286,9 @@ struct B2_API b2Mat33
 /// Rotation
 struct B2_API b2Rot
 {
-	b2Rot() {}
+	b2Rot() 
+		: b2Rot(0)
+	{}
 
 	/// Initialize from an angle in radians
 	explicit b2Rot(float angle)

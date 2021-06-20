@@ -7,6 +7,7 @@ void b2SectorObject::DetachProxy(const b2AABB& aabb)
   {
     if (proxy.attached && !proxy.sector->IsOverlapping(aabb))
     {
+      proxy.sector->DestroyProxy(proxy.proxyId);
       proxy.attached = false;
       m_proxyCount--;
     }

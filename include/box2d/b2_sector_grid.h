@@ -2,7 +2,9 @@
 #define B2_SECTOR_GRID_H
 
 #include "b2_sector.h"
+#include "b2_sector_collider.h"
 #include <functional>
+#include <set>
 #include <queue>
 #include <unordered_map>
 
@@ -64,7 +66,7 @@ public:
    * @param objects - the overlapping objects
    */
   template <typename T>
-  int Query(const b2SectorObject& obj, std::vector<T>& objects);
+  int Query(const b2SectorCollider& collider, std::vector<T>& objects);
 
   // 섹터 범위를 넘지 않는 AABB로 겹치는 오브젝트 검색
   template <typename T>
@@ -223,7 +225,7 @@ private:
       iy >= 1 && iy < m_sectorCountY - 1;
   }
 
-  bool ShouldCollide(const b2SectorObject& objA, const b2SectorObject& objB);
+  bool ShouldCollide(const b2Filter& filterA, const b2Filter& filterB);
 
   int AcquireObjectId();
 
@@ -245,17 +247,21 @@ private:
 };
 
 template <typename T>
-int b2SectorGrid::Query(const b2SectorObject& obj, std::vector<T>& objects)
+int b2SectorGrid::Query(const b2SectorCollider& collider, std::vector<T>& objects)
 {
   b2AABB aabb;
-  obj.GetShape()->ComputeAABB(&aabb, obj.GetTransform(), 0);
+  collider.GetShape()->ComputeAABB(&aabb, collider.GetTransform(), 0);
 
   int ix = GetSectorIndexX(aabb.GetCenter().x);
   int iy = GetSectorIndexX(aabb.GetCenter().y);
 
   b2Assert(CheckIndexBounds(ix, iy));
+  if (!CheckIndexBounds(ix, iy))
+  {
+    return 0;
+  }
   
-  std::vector<b2ObjectId> sobjs;
+  std::set<b2ObjectId> sobjs;
 
   // slock
   {
@@ -271,7 +277,7 @@ int b2SectorGrid::Query(const b2SectorObject& obj, std::vector<T>& objects)
         for (auto& proxy : lst)
         {
           auto o = sector->GetObject(proxy);
-          sobjs.push_back(o->GetObjectId());
+          sobjs.insert(o->GetObjectId());
         }
 
         return true;
@@ -289,10 +295,10 @@ int b2SectorGrid::Query(const b2SectorObject& obj, std::vector<T>& objects)
       {
         auto obj2 = iter->second;
 
-        if (ShouldCollide(obj, *obj2))
+        if (ShouldCollide(collider.GetFilter(), obj2->GetFilter()))
         {
           auto col = b2TestOverlap(
-            obj.GetShape(), 0, obj2->GetShape(), 0, obj.GetTransform(), obj2->GetTransform()
+            collider.GetShape(), 0, obj2->GetShape(), 0, collider.GetTransform(), obj2->GetTransform()
           );
 
           if (col)
@@ -353,9 +359,8 @@ int b2SectorGrid::QueryCircle(const b2Vec2& pos, float radius, const b2Filter& f
   circle.m_radius = radius;
   circle.m_p = pos;
 
-  b2SectorObject cobj(0, &circle, filter, b2Transform(b2Vec2(0, 0), b2Rot(0)), nullptr);
-
-  return Query(cobj, objects);
+  b2SectorCollider collider(&circle, filter, b2Transform(b2Vec2(0, 0)));
+  return Query(collider, objects);
 }
 
 template <typename T>
@@ -364,16 +369,12 @@ int b2SectorGrid::QueryOBB(float hx, float hy, const b2Vec2& pos, float angle, c
   b2PolygonShape obb; 
   obb.SetAsBox(hx, hy, pos, angle);
 
-  b2SectorObject cobj(0, &circle, filter, b2Transform(b2Vec2(0, 0), b2Rot(0)), nullptr);
-
+  b2SectorCollider collider(&circle, filter, b2Transform(b2Vec2(0, 0)));
   return Query(cobj, objects);
 }
 
-inline bool b2SectorGrid::ShouldCollide(const b2SectorObject& objA, const b2SectorObject& objB)
+inline bool b2SectorGrid::ShouldCollide(const b2Filter& filterA, const b2Filter& filterB)
 {
-  const b2Filter& filterA = objA.GetFilter();
-  const b2Filter& filterB = objB.GetFilter();
-
   if (filterA.groupIndex == filterB.groupIndex && filterA.groupIndex != 0)
   {
     return filterA.groupIndex > 0;
