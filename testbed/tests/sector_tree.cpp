@@ -2,6 +2,13 @@
 #include "settings.h"
 #include <box2d/b2_sector_grid.h>
 
+enum class ShapeType
+{
+	OBB, 
+	Circle, 
+	Triangle
+};
+
 class Projectile
 {
 public:
@@ -10,13 +17,10 @@ public:
 		, m_id(id)
 		, m_filter(filter)
 		, m_objectId(0)
+		, m_shapeType(ShapeType::Triangle)
 	{
+		m_shape = CreateShape();
 		m_rotation = b2Rot(RandomFloat(-3.14f, 3.14f));
-
-		float w = RandomFloat(30, 100);
-		float h = RandomFloat(30, 100);
-		m_obb = new b2PolygonShape();
-		m_obb->SetAsBox(w, h);
 
 		auto bounds = grid->GetWorldBounds();
 
@@ -28,10 +32,48 @@ public:
 		m_position = m_spos;
 	}
 
+	~Projectile()
+	{
+	}
+
+	b2Shape* CreateShape()
+	{
+		switch (m_shapeType)
+		{
+		case ShapeType::OBB:
+		{
+			float w = RandomFloat(30, 100);
+			float h = RandomFloat(30, 100);
+
+			auto shape = new b2PolygonShape();
+			shape->SetAsBox(w, h);
+			return shape;
+		}
+		case ShapeType::Circle:
+		{
+			auto shape = new b2CircleShape();
+			shape->m_radius = RandomFloat(30, 100);
+			return shape;
+		}
+		case ShapeType::Triangle:
+		{
+			float halfWidth = RandomFloat(30, 100);
+			float height = RandomFloat(30, 100);
+
+			auto shape = new b2PolygonShape();
+			shape->m_count = 3;
+			shape->m_vertices[0] = b2Vec2(-halfWidth, 0);
+			shape->m_vertices[1] = b2Vec2(halfWidth, 0);
+			shape->m_vertices[2] = b2Vec2(0, height);
+			return shape;
+		}
+		}
+	}
+
 	void Spawn()
 	{
 		b2Transform xf(m_position, m_rotation);
-		auto res = m_grid->Spawn(m_obb, m_filter, xf, reinterpret_cast<void*>(&m_id));
+		auto res = m_grid->Spawn(m_shape, m_filter, xf, reinterpret_cast<void*>(&m_id));
 
 		if (b2Result::Succeeded(res))
 		{
@@ -65,7 +107,7 @@ public:
 			rx::slock slock(m_lock);
 
 			b2Transform xf(m_position, m_rotation);
-			b2SectorCollider collider(m_obb, m_filter, xf);
+			b2SectorCollider collider(m_shape, m_filter, xf);
 
 			std::vector<int> lst;
 
@@ -81,7 +123,12 @@ public:
 
 	const b2Shape* GetShape() const
 	{
-		return m_obb;
+		return m_shape;
+	}
+
+	ShapeType GetShapeType() const
+	{
+		return m_shapeType;
 	}
 
 	const b2Vec2& GetPosition() const
@@ -127,8 +174,9 @@ private:
 	b2Vec2 m_position;
 	b2Rot m_rotation;
 	b2Vec2 m_dir;
-	b2PolygonShape* m_obb;
+	b2Shape* m_shape;
 	rx::lockable m_lock;
+	ShapeType m_shapeType;
 };
 
 class Actor
@@ -341,10 +389,9 @@ public:
 								});
 						}
 					}
+				
+					std::this_thread::sleep_for(std::chrono::milliseconds(10));
 				}
-
-				std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
 				});
 
 			m_threads[ti].swap(thread);
@@ -394,8 +441,9 @@ public:
 		DrawMouseOBB();
 
 		g_debugDraw.DrawString(b2Vec2(0, 0), m_coord.c_str());
-
 		g_debugDraw.Flush();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 
 	void MouseDown(const b2Vec2& p) override
@@ -501,27 +549,69 @@ public:
 		for (int i = 0; i < e_projectileCount; ++i)
 		{
 			auto projectile = m_projectiles[i];
-			auto obb = reinterpret_cast<const b2PolygonShape*>(projectile->GetShape());
-			auto rot = projectile->GetRotation();
-			auto pos = projectile->GetPosition();
 
-			b2Color c(0.0f, 0.0f, 1.0f);
-
-			b2Vec2 vs[4];
-
-			for (int iv = 0; iv < 4; ++iv)
+			switch (projectile->GetShapeType())
 			{
-				auto v = obb->m_vertices[iv];
-				auto vx = v.x * rot.c - v.y * rot.s;
-				auto vy = v.x * rot.s + v.y * rot.c;
-				vs[iv].x = vx + pos.x;
-				vs[iv].y = vy + pos.y;
-			}
+			case ShapeType::OBB:
+			{
+				auto obb = reinterpret_cast<const b2PolygonShape*>(projectile->GetShape());
+				auto rot = projectile->GetRotation();
+				auto pos = projectile->GetPosition();
 
-			g_debugDraw.DrawSegment(vs[0], vs[1], c);
-			g_debugDraw.DrawSegment(vs[1], vs[2], c);
-			g_debugDraw.DrawSegment(vs[2], vs[3], c);
-			g_debugDraw.DrawSegment(vs[3], vs[0], c);
+				b2Color c(0.0f, 0.0f, 1.0f);
+
+				b2Vec2 vs[4];
+
+				for (int iv = 0; iv < 4; ++iv)
+				{
+					auto v = obb->m_vertices[iv];
+					auto vx = v.x * rot.c - v.y * rot.s;
+					auto vy = v.x * rot.s + v.y * rot.c;
+					vs[iv].x = vx + pos.x;
+					vs[iv].y = vy + pos.y;
+				}
+
+				g_debugDraw.DrawSegment(vs[0], vs[1], c);
+				g_debugDraw.DrawSegment(vs[1], vs[2], c);
+				g_debugDraw.DrawSegment(vs[2], vs[3], c);
+				g_debugDraw.DrawSegment(vs[3], vs[0], c);
+				break;
+			}
+			case ShapeType::Circle:
+			{
+				auto circle = reinterpret_cast<const b2CircleShape*>(projectile->GetShape());
+				auto rot = projectile->GetRotation();
+				auto pos = projectile->GetPosition();
+
+				b2Color c(0.0f, 0.0f, 1.0f);
+				g_debugDraw.DrawCircle(pos, circle->m_radius, c);
+				break;
+			}
+			case ShapeType::Triangle:
+			{
+				auto triangle = reinterpret_cast<const b2PolygonShape*>(projectile->GetShape());
+				auto rot = projectile->GetRotation();
+				auto pos = projectile->GetPosition();
+
+				b2Color c(0.0f, 0.0f, 1.0f);
+
+				b2Vec2 vs[3];
+
+				for (int iv = 0; iv < 3; ++iv)
+				{
+					auto v = triangle->m_vertices[iv];
+					auto vx = v.x * rot.c - v.y * rot.s;
+					auto vy = v.x * rot.s + v.y * rot.c;
+					vs[iv].x = vx + pos.x;
+					vs[iv].y = vy + pos.y;
+				}
+
+				g_debugDraw.DrawSegment(vs[0], vs[1], c);
+				g_debugDraw.DrawSegment(vs[1], vs[2], c);
+				g_debugDraw.DrawSegment(vs[2], vs[0], c);
+				break;
+			}
+			}
 		}
 	}
 
