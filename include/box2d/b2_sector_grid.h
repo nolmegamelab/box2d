@@ -32,10 +32,15 @@ struct b2SectorSettings
 
 /// 내부에 b2Sector들을 갖는 섹터들의 그리드 월드 내에서 충돌 처리
 /**
+ * b2SectorSettings로 월드 경계와 섹터 크기를 지정
  */
 class B2_API b2SectorGrid
 {
 public:
+  // b2SectorSettings로 월드 경계와 섹터 크기를 지정
+  /**
+   * 내부적으로 월드를 확장하여 안전하게 섹터들에 접근할 수 있게 준비
+   */
   b2SectorGrid(const b2SectorSettings& settings);
 
   ~b2SectorGrid();
@@ -63,7 +68,7 @@ public:
   // shape와 겹치는 오브젝트들을 추출한다. 
   /**
    * @param obj - b2SectorObject. Shape, Filter, Transform needs to be valid
-   * @param objects - the overlapping objects
+   * @param objects - 충돌한 오브젝트의 userData를 T 타잎으로 변환한 목록
    */
   template <typename T>
   int Query(const b2SectorCollider& collider, std::vector<T>& objects);
@@ -73,9 +78,23 @@ public:
   int Query(const b2AABB& aabb, std::vector<T>& objects);
 
   // 원 범위로 검색
+  /** 
+   * 내부적으로 b2SectorCollider를 사용하는 Query 함수를 호출
+   * @param pos - 원의 중심 위치 
+   * @param radius - 원의 반경 
+   * @param filter - 충돌 필터링 정보 
+   * @param objects - 충돌한 오브젝트의 userData를 T 타잎으로 변환한 목록
+   */
   template <typename T>
   int QueryCircle(const b2Vec2& pos, float radius, const b2Filter& filter, std::vector<T>& objects);
 
+  // OBB 범위로 검색
+  /** 
+   * @param hx - half width. OBB의 가로 길이의 절반 
+   * @param hy - half height. OBB의 세로 길이의 절반
+   * @param pos - OBB의 중심점 위치 
+   * @param angline - OBB의 회전값
+   */
   template <typename T>
   int QueryOBB(float hx, float hy, const b2Vec2& pos, float angle, const b2Filter& filter, std::vector<T>& objects);
 
@@ -113,8 +132,10 @@ private:
   using ObjectMap = std::unordered_map<b2ObjectId, b2SectorObject*>;
   using SectorMap = std::unordered_map<int, b2Sector*>;   // y index * m_sectorCountX + x index
 
+  // x 인덱스가 ix이고, y 인덱스가 iy인 섹터가 없으면 만듦
   void EnsureSector(int ix, int iy);
 
+  // 섹터에 대해 함수 f를 호출
   bool Apply(b2Sector* sector, std::function<bool(b2Sector*)> f)
   {
     if (sector)
@@ -125,6 +146,7 @@ private:
     return false;
   }
 
+  // 인접한 9개 섹터에 대해 함수 f를 호출
   int ApplyNeighbors(int ix, int iy, std::function<bool(b2Sector*)> f)
   {
     int trueCount = 0;
@@ -144,6 +166,7 @@ private:
     return trueCount;
   }
 
+  // ix, iy의 섹터를 얻음
   b2Sector* GetSector(int ix, int iy)
   {
     int index = GetSectorIndexFrom(ix, iy);
@@ -225,6 +248,7 @@ private:
       iy >= 1 && iy < m_sectorCountY - 1;
   }
 
+  // 그룹이 같거나 같은 카테고리에 대해 마스크 비트가 설정되면 충돌 체크
   bool ShouldCollide(const b2Filter& filterA, const b2Filter& filterB);
 
   int AcquireObjectId();

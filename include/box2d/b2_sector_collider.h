@@ -7,9 +7,17 @@
 #include "b2_settings.h"
 #include "b2_collision.h"
 
+// b2Shape와 필터, 변환을 갖는 충돌 체크 오브젝트
+/** 
+ * b2SectorGrid의 Query 함수 호출을 직접할 때 필요한 오브젝트. 
+ */
 class b2SectorCollider
 {
 public:
+  // 충돌 체크 정보 전달 
+  /** 
+   * NOTE: shape에 대한 소유권이 이전 되지 않으므로 호출 쪽에서 해제
+   */
   b2SectorCollider(b2Shape* shape, const b2Filter& filter, const b2Transform& tf)
     : m_shape(shape)
     , m_filter(filter)

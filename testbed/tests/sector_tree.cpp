@@ -9,6 +9,7 @@ enum class ShapeType
 	Triangle
 };
 
+// 섹터에 넣고 이동하면서 충돌을 체크하는 발사체
 class Projectile
 {
 public:
@@ -17,7 +18,7 @@ public:
 		, m_id(id)
 		, m_filter(filter)
 		, m_objectId(0)
-		, m_shapeType(ShapeType::Triangle)
+		, m_shapeType(ShapeType::OBB)
 	{
 		m_shape = CreateShape();
 		m_rotation = b2Rot(RandomFloat(-3.14f, 3.14f));
@@ -60,6 +61,7 @@ public:
 			float halfWidth = RandomFloat(30, 100);
 			float height = RandomFloat(30, 100);
 
+			// 삼각형. 다른 다각형도 버텍스 위치만 지정하고 변환을 나중에 적용하면 됨.
 			auto shape = new b2PolygonShape();
 			shape->m_count = 3;
 			shape->m_vertices[0] = b2Vec2(-halfWidth, 0);
@@ -68,6 +70,8 @@ public:
 			return shape;
 		}
 		}
+
+		return nullptr;
 	}
 
 	void Spawn()
@@ -179,6 +183,7 @@ private:
 	ShapeType m_shapeType;
 };
 
+// 섹터에서 랜덤 이동을 하는 액터 (엔티티)
 class Actor
 {
 public: 
@@ -289,7 +294,7 @@ private:
 	rx::lockable m_lock;
 };
 
-// SectrGrid
+// 테스트 클래스. 쓰레드로 이동 / 충돌 체크 처리.
 class SectorGrid : public Test
 {
 private: 
@@ -298,8 +303,8 @@ public:
 
 	enum
 	{
-		e_actorCount = 3, 
-		e_projectileCount = 3, 
+		e_actorCount = 3000, 
+		e_projectileCount = 3000, 
 		e_threadCount = 4
 	};
 

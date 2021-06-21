@@ -14,6 +14,8 @@ using b2ObjectId = int;
 
 class b2Sector;
 
+// b2SectorGrid 내부에서 관리하고 b2DynamicTree의 Proxy와 연결하여 
+// 관리할 수 있게 하는 오브젝트
 class b2SectorObject
 {
 public: 
@@ -26,9 +28,17 @@ public:
   };
 
 public: 
+  // 생성자
+  /** 
+   * @param oid - objectId로 b2SectorGrid에서 할당
+   * @param shape - b2Shape 모양으로 소유권을 넘겨 받아 소멸자에서 해제
+   * @param filter - 충돌 필터 
+   * @param tf - 변환 
+   * @param userData - 애플리케이션에서 전달한 데이터. 소유권을 받지 않음
+   */
   b2SectorObject(
     b2ObjectId oid, b2Shape* shape, const b2Filter& filter,
-    const b2Transform& tf, void* userData, bool collider = false)
+    const b2Transform& tf, void* userData)
     : m_objectId(oid)
     , m_shape(shape)
     , m_filter(filter)
@@ -36,7 +46,6 @@ public:
     , m_userData(userData)
     , m_proxyCount(0)
     , m_proxies()
-    , m_collider(collider)
   {
     b2Assert(m_shape);
     b2Assert(m_userData);
@@ -44,10 +53,7 @@ public:
 
   ~b2SectorObject()
   {
-    if (!m_collider)
-    {
-      delete m_shape;
-    }
+    delete m_shape;
   }
 
   b2ObjectId GetObjectId() const 
@@ -87,6 +93,7 @@ public:
     m_transform = tf;
   }
 
+  // b2DynamicTree의 proxy와 연결
   bool AttachProxy(b2Sector* sector, int proxyId)
   {
     b2Assert(sector);
@@ -104,10 +111,13 @@ public:
     return false;
   }
 
+  // aabb와 겹치지 않는 섹터들에서 나옴
   void DetachProxy(const b2AABB& aabb);
 
+  // proxyId에 해당하는 섹터에서 나옴
   void DetachProxy(int proxyId);
 
+  // attach 된 모든 섹터에서 나옴
   void DetachProxyAll();
 
   int GetProxyIdBy(b2Sector* sector)
@@ -149,11 +159,11 @@ private:
 
   int m_proxyCount; 
   std::array<Proxy, 4> m_proxies;
-  bool m_collider;
 };
 
-/// 섹터 내부의 b2SectorObject들을 관리한다. 
+// 섹터 내부의 b2SectorObject들을 관리하고, b2DynamicTree의 프록시와 연결
 /**
+ * b2DynamicTree와 연결해 주는 중간 인터페이스. 락 처리가 주 임무.
  */
 class B2_API b2Sector
 {
@@ -161,34 +171,42 @@ public:
   using ObjectId = std::size_t;
 
 public: 
+  // index와 bounds로 생성
   b2Sector(int index, const b2AABB& bounds);
 
   ~b2Sector();
 
+  // aabb를 범위로 갖고 userData를 보관하는 b2DynamicTree의 Proxy 생성. userData는 b2SectorObject.
   int32 CreateProxy(const b2AABB& aabb, void* userData);
 
+  // proxyId의 프록시를 b2DynamicTree에서 제거
   void DestroyProxy(int32 proxyId);
 
-  bool MoveProxy(int32 proxyId, const b2AABB& aabb1, const b2Vec2& displacement);
+  // proxyId의 프록시를 b2DynamicTree에서 이동. 
+  bool MoveProxy(int32 proxyId, const b2AABB& aabb, const b2Vec2& displacement);
 
+  // aabb 범위 내에 들어오는 proxyId 목록을 얻음
   int Query(const b2AABB& aabb, std::vector<int32>& lst) const
   {
     rx::slock slock(m_lock);
     return m_tree->Query(aabb, lst);
   }
 
+  // input 레이와 충돌하는 proxyId 목록을 얻음
   int RayCast(const b2RayCastInput& input, std::vector<int32>& lst) const
   {
     rx::slock slock(m_lock);
     return m_tree->RayCast(input, lst);
   }
 
+  // proxyId에 해당하는 b2SectorObject를 얻음
   b2SectorObject* GetObject(int32 proxyId)
   {
     rx::slock slock(m_lock);
     return reinterpret_cast<b2SectorObject*>(m_tree->GetUserData(proxyId));
   }
 
+  // 섹터 범위와 겹치는 지 확인
   bool IsOverlapping(const b2AABB& aabb)
   {
     return b2TestOverlap(m_bounds, aabb);
