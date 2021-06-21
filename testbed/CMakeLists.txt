@@ -55,7 +55,7 @@ set (TESTBED_SOURCE_FILES
 	tests/restitution.cpp
 	tests/revolute_joint.cpp
 	tests/rope.cpp
-	tests/sector_tree.cpp
+	tests/sector_grid.cpp
 	tests/sensor.cpp
 	tests/shape_cast.cpp
 	tests/shape_editing.cpp
